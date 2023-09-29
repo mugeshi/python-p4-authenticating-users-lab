@@ -18,39 +18,53 @@ db.init_app(app)
 
 api = Api(app)
 
-class ClearSession(Resource):
 
-    def delete(self):
+users = [
+    {'id': 1, 'username': 'user1', 'password': 'password1'},
+    {'id': 2, 'username': 'user2', 'password': 'password2'},
+ 
+]
+
+class Login(Resource):
+    def post(self):
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')  
+        
+        # Find the user by username (assuming usernames are unique)
+        user = next((user for user in users if user['username'] == username), None)
+        
+        if user and user['password'] == password:  # Check if the password matches
+            # Set the session's user_id value to user's id
+            session['user_id'] = user['id']
+            return jsonify(user), 200  # Return user data as JSON with 200 status
+        
+        return {'message': 'Invalid username or password'}, 401  # Return 401 for unauthorized
+
+        
+        
+api.add_resource(Login, '/login')
     
-        session['page_views'] = None
-        session['user_id'] = None
-
+class Logout(Resource):
+    def delete(self):
+        # Remove the user_id value from the session
+        session.pop('user_id', None)
         return {}, 204
 
-class IndexArticle(Resource):
-    
+api.add_resource(Logout, '/logout')
+
+class CheckSession(Resource):
     def get(self):
-        articles = [article.to_dict() for article in Article.query.all()]
-        return articles, 200
+        user_id = session.get('user_id')
+        if user_id:
+            # Return the user data as JSON with a 200 status code
+            user = next((user for user in users if user['id'] == user_id), None)
+            if user:
+                return jsonify(user), 200
+        return {}, 401  # Return 401 for unauthorized
 
-class ShowArticle(Resource):
+api.add_resource(CheckSession, '/check_session')
 
-    def get(self, id):
-        session['page_views'] = 0 if not session.get('page_views') else session.get('page_views')
-        session['page_views'] += 1
-
-        if session['page_views'] <= 3:
-
-            article = Article.query.filter(Article.id == id).first()
-            article_json = jsonify(article.to_dict())
-
-            return make_response(article_json, 200)
-
-        return {'message': 'Maximum pageview limit reached'}, 401
-
-api.add_resource(ClearSession, '/clear')
-api.add_resource(IndexArticle, '/articles')
-api.add_resource(ShowArticle, '/articles/<int:id>')
 
 
 if __name__ == '__main__':
